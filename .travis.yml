@@ -1,0 +1,59 @@
+language: android
+
+env:
+  global:
+    - CMAKE_VERSION=3.9.4
+    - NDK_VERSION=r14b
+    - ANDROID_NDK_HOME=$HOME/android-ndk-$NDK_VERSION
+sudo: true
+jdk: oraclejdk8
+
+cache:
+  - apt
+  - directories:
+      - ${HOME}/.m2
+      - ${HOME}/.gradle
+
+android:
+  components:
+    - tools
+    - platform-tools
+    - build-tools-26.0.2
+    - android-26
+
+before_install:
+  - sudo dpkg --add-architecture i386
+  - sudo apt-get update -qq
+  - wget -q https://cmake.org/files/v3.9/cmake-${CMAKE_VERSION}-Linux-x86_64.sh
+  - chmod a+x cmake-${CMAKE_VERSION}-Linux-x86_64.sh
+  - sudo ./cmake-${CMAKE_VERSION}-Linux-x86_64.sh --skip-license --prefix=/usr/local
+  - export PATH=/usr/local/bin:${PATH}
+  - wget -q https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux-x86_64.zip
+  - unzip -q android-ndk-${NDK_VERSION}-linux-x86_64.zip -d ${HOME}
+  - export PATH=${PATH}:${ANDROID_NDK_HOME}
+  - sudo apt-get install yasm
+  - sudo apt-get install nasm
+  - sudo apt-get install ant
+  - sudo apt-get install python
+  - sudo apt-get install intltool
+  - sudo apt-get install vim-common
+  - sudo apt-get install libstdc++6:i386 libgcc1:i386 zlib1g:i386 libncurses5:i386
+  - mkdir $ANDROID_HOME/licenses
+  - echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55" >> $ANDROID_HOME/licenses/android-sdk-license
+  - echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
+
+script:
+  - ./prepare.py -G 'Unix Makefiles'
+  - make liblinphone-android-sdk
+
+deploy:
+  provider: pages
+  skip_cleanup: true
+  github_token: $GITHUB_TOKEN
+  local_dir: bin
+  on:
+    branch: develop
+    target-branch: gh-pages
+
+notifications:
+  irc: "chat.freenode.net#iln-sk/linphpne-android@github.com"
