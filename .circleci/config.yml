@@ -1,0 +1,79 @@
+defaults: &defaults
+  working_directory: ~/code
+  docker:
+    - image: circleci/android:api-26-alpha
+  environment:
+    JVM_OPTS: -Xmx3200m
+    CMAKE_VERSION: 3.9.4
+    NDK_VERSION: r14b
+
+version: 2
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - run:
+          name: Setup enviroments
+          command: |
+            sudo mkdir -p /opt/android/ndk
+            sudo chown circleci.circleci /opt/android/ndk
+      - restore_cache:
+         keys:
+          - android-ndk
+      - run:
+          name: Setup an Android NDK
+          command: |
+            if [[ ! -e /opt/android/ndk/android-ndk-${NDK_VERSION} ]]; then
+              wget -q https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux-x86_64.zip &&
+              unzip -q android-ndk-${NDK_VERSION}-linux-x86_64.zip &&
+              export ANDROID_NDK_HOME=/opt/android/ndk/android-ndk-${NDK_VERSION} &&
+              export PATH=${PATH}:${ANDROID_NDK_HOME}
+            fi
+      - save_cache:
+          key: android-ndk
+          paths:
+            - /opt/android/ndk
+      - run:
+          name: Setup a machine
+          command: |
+            sudo mkdir -p /setup &&
+            cd /setup &&
+            sudo dpkg --add-architecture i386 &&
+            sudo apt-get update -qq &&
+            sudo wget -q https://cmake.org/files/v3.9/cmake-${CMAKE_VERSION}-Linux-x86_64.sh &&
+            sudo chmod a+x cmake-${CMAKE_VERSION}-Linux-x86_64.sh &&
+            sudo ./cmake-${CMAKE_VERSION}-Linux-x86_64.sh --skip-license --prefix=/usr/local &&
+            export PATH=/usr/local/bin:${PATH} &&
+            sudo apt-get install -qq -y --no-install-recommends yasm &&
+            sudo apt-get install -qq -y --no-install-recommends nasm &&
+            sudo apt-get install -qq -y --no-install-recommends ant &&
+            sudo apt-get install -qq -y --no-install-recommends python &&
+            sudo apt-get install -qq -y --no-install-recommends intltool &&
+            sudo apt-get install -qq -y --no-install-recommends vim-common &&
+            sudo apt-get install -qq -y --no-install-recommends libstdc++6:i386 libgcc1:i386 zlib1g:i386 libncurses5:i386
+      - run:
+          name: Update a .bashrc
+          command: |
+            cat <<EOF >> ~/.bashrc
+            export PATH=/usr/local/bin:\${PATH}
+            export ANDROID_NDK_HOME=/opt/android/ndk/android-ndk-${NDK_VERSION}
+            export PATH=\${PATH}:\${ANDROID_NDK_HOME}
+            EOF
+      - checkout
+      - run:
+          name: Update submodules
+          command: |
+            git submodule sync &&
+            git submodule update --init --recursive
+      - run:
+          name: Execute prepare.py
+          command: |
+            ls -l ~/.bashrc
+            cat ~/.bashrc
+            source ~/.bashrc
+            ./prepare.py -G 'Unix Makefiles'
+      - run:
+          name: Build
+          command: |
+            source ~/.bashrc
+            make liblinphone-android-sdk
